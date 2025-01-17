@@ -1,0 +1,13 @@
+git add -A
+git commit -a -m "message"
+git push
+
+On Linux (WSL):
+
+wsl -l -v
+
+wsl -d Ubuntu
+cd /mnt/c/Users/59201/OneDrive/Desktop/CS283/cs283
+
+gcc -o program program.c
+./program {argv2} {argv1}
