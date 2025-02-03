@@ -198,6 +198,8 @@ int word_len(char *str) {
 
     return str_len;
 }
+
+
 int replace_string(char *buff, int str_len, char *target_string, char *replacement_string) {
     char current_character;
     int matching_char = 0;
