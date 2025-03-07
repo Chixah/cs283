@@ -62,132 +62,6 @@ void empty(command_list_t *clist) {
     }
 }
 
-int build_cmd_list(char *cmd_line, command_list_t *clist) {
-    // Return Code
-    int rc = OK;
-
-    if (strlen(cmd_line) == 0 || is_empty(cmd_line) == 0) {
-        rc = WARN_NO_CMDS;
-    } 
-
-    
-    // Breakdown
-    // https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
-
-    char temp[256];
-    int count = 0;
-    int command = 0;
-    int command_header = 1;
-    int after_pipe = 0;
-
-    for(int i = 0; cmd_line[i] != '\0'; i++) {
-        char current_character = cmd_line[i];
-        //printf("Character position[%d]: %c[%d]\n", i, current_character, current_character);
-
-        if(current_character != PIPE_CHAR) {
-            if(current_character == SPACE_CHAR && command_header == 1 && after_pipe == 0) {
-                temp[count] = '\0';
-                /*for(int j = 0; temp[j] != '\0'; j++) {
-                    printf("%c[%d] ", temp[j], temp[j]);
-                }
-                printf("Count: %d ", count); */
-                strncpy(clist->commands[command].argv[command], temp, count+1);
-                //printf("\n");
-                count = 0;
-                command_header = 0;
-
-            } else if (after_pipe == 1) {
-                if(current_character == SPACE_CHAR) {
-                    command_header = 1;
-                    count = 0;
-                    after_pipe = 0;
-                } else {
-                    after_pipe = 0;
-                    temp[count] = current_character;
-                    count++;
-                }
-                
-            } else {
-                temp[count] = current_character;
-                count++;
-            }
-            
-        }
-
-        if(current_character == PIPE_CHAR){
-            if(command_header == 0) {
-                if (temp[count-1] == SPACE_CHAR) {
-                    temp[count-1] = '\0';
-                    strncpy(clist->commands[command].argv[command], temp, count);
-                } else {
-                    temp[count] = '\0';
-                /* for(int j = 0; temp[j] != '\0'; j++) {
-                    printf("%c[%d] ", temp[j], temp[j]);
-                }
-                printf("Count: %d ", count); */
-                    strncpy(clist->commands[command].argv[command], temp, count+1);
-                //printf("\n");
-                }
-                
-            } 
-            if(command_header == 1){
-                temp[count] = '\0';
-                /* for(int j = 0; temp[j] != '\0'; j++) {
-                    printf("%c[%d] ", temp[j], temp[j]);
-                }
-                printf("Count: %d ", count); */
-                strncpy(clist->commands[command].argv[command], temp, count+1);
-                //printf("\n");
-            }
-            count = 0;
-            command_header = 1;
-            command++;
-            after_pipe = 1;
-            
-        }
-
-        
-
-    }
-
-    //printf("Outside:\n");
-    temp[count] = '\0';
-    /*for(int j = 0; temp[j] != '\0'; j++) {
-        printf("%c[%d] ", temp[j], temp[j]);
-    }
-    //printf("Count: %d ", count); */
-
-    //printf("Outside command header %d\n", command_header);
-
-    if (command_header == 1) {
-        strncpy(clist->commands[command].argv[command], temp, count+1);
-        clist->commands[command].argv[0] = '\0';
-    } else if (command_header == 0){
-        strncpy(clist->commands[command].argv[command], temp, count+1);
-    }
-    command++;
-    
-
-    if (command > 8) {
-        rc = ERR_TOO_MANY_COMMANDS;
-    } else {
-        clist->num = command;
-    }
-
-    for (int i = 0; i < clist->num; i++) {
-        if(strlen(clist->commands[command].argv[command]) > 256) {
-            rc = ERR_CMD_OR_ARGS_TOO_BIG;
-        } else if (strlen(clist->commands[command].argv[command]) > 64) {
-            rc = ERR_CMD_OR_ARGS_TOO_BIG;
-        }
-    }
-    
-    
-    //printf("\n");
-    //printf("Number of Commands: %d\n", clist->num);
-    return rc;
- }
-
 int alloc_cmd_buff(cmd_buff_t *cmd_buff) {
     cmd_buff->_cmd_buffer = (char *)malloc(SH_CMD_MAX * sizeof(char));
     if (cmd_buff->_cmd_buffer == NULL) {
@@ -315,6 +189,14 @@ int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
         token = strtok(NULL, "|"); // Get the next command
     }
 
+    
+
+    cmd_buff->argc = argc;
+    for(int i = 0; i < argc - 1; i++) {
+        int length = strlen(cmd_buff->argv[i]);
+        cmd_buff->argv[i][length-1] = '\0';
+    }
+
     /*for(int i = 0; i < argc; i++) {
         printf("Argument[%d]: \n\n", i);
         for(int j = 0; cmd_buff->argv[i][j] != '\0'; j++){
@@ -323,8 +205,6 @@ int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
         printf("Argument length %ld\n", strlen(cmd_buff->argv[i]));
         printf("\n");
     } */
-
-    cmd_buff->argc = argc;
 
     if (rc != OK) {
         // Clean up in case of errors
@@ -384,81 +264,141 @@ int exec_cmd(cmd_buff_t *cmd_buff) {
         } else if (command == BI_EXECUTED) {
             rc = OK;
         } else if (command == BI_NOT_BI) {
-            pid_t pid = fork();
-    
-            if (pid == 0) {
-                if(execvp(cmd_buff->argv[0], cmd_buff->argv) == -1) {
-                    //printf("Execvp went wrong!!!\n\n");
-                    int status;
-                    waitpid(pid, &status, 0);
-    
-                    if (WIFEXITED(status)) {
-                        rc = WEXITSTATUS(status);
-                    }
-                    return rc;
-                }
-    
-            } else if (pid < 0) {
-                rc = ERR_EXEC_CMD;
-                return rc;
-            } else {
-                int status;
-                waitpid(pid, &status, 0);
-    
-                if (WIFEXITED(status)) {
-                    rc = WEXITSTATUS(status);
-                }
-                return rc;
-            }
+            rc = OK;
         }
-    } else {
-        int fd[2]; // `fd` keeps track of input for each command
-        pipe(fd); // Create a pipe
-        pid_t pid1, pid2;
-
-        pid1 = fork();
-        if (pid1 == -1) {
-            perror("fork");
-            exit(EXIT_FAILURE);
-        }
-
-        if (pid1 == 0) {
-            // Child process 1 (ls)
-            close(fd[0]); // Close unused read end
-            dup2(fd[1], STDOUT_FILENO); // Redirect stdout to pipe write end
-            close(fd[1]);
-
-            execlp("ls", "ls", NULL);
-            perror("execlp");
-            exit(EXIT_FAILURE);
-        }
-
-        pid2 = fork();
-        if (pid2 == -1) {
-            perror("fork");
-            exit(EXIT_FAILURE);
-        }
-
-        if (pid2 == 0) {
-            // Child process 2 (grep)
-            close(fd[1]); // Close unused write end
-            dup2(fd[0], STDIN_FILENO); // Redirect stdin to pipe read end
-            close(fd[0]);
-
-            execlp("grep", "grep", ".c", NULL);
-            perror("execlp");
-            exit(EXIT_FAILURE);
-        }
-
-        close(fd[0]);
-        close(fd[1]);
-
-        waitpid(pid1, NULL, 0);
-        waitpid(pid2, NULL, 0);
     }
-
     return rc;
 }
+
+int build_cmd_list(cmd_buff_t *cmd_buff, command_list_t *clist) {
+    if (!cmd_buff || !clist) {
+        return -1; // Invalid input
+    }
+
+    clist->num = cmd_buff->argc;
+    //clist->commands[0].argv[0] = (char *)malloc(ARG_MAX);
+    //strcpy(clist->commands[0].argv[0], cmd_buff->argv[0]);
+
+    for (int i = 0; i < cmd_buff->argc; i++) {
+
+        char *token = strtok(cmd_buff->argv[i], " ");
+        int j = 0;
+    
+        while (token != NULL) {
+            // Allocate memory for each argument
+            clist->commands[i].argv[j] = (char *)malloc(strlen(token) + 1);
+            //printf("Token[%s]\n", token);
+    
+            strcpy(clist->commands[i].argv[j], token);
+    
+            j++;
+    
+            token = strtok(NULL, " ");
+        }
+        clist->commands[i].argv[j] = NULL;
+        clist->commands[i].argc = j;
+        
+    }
+    
+    //printf("Command[0]Arg[0]: %s", clist->commands[0].argv[0]);
+    //printf("Command[1]Arg[0]: %s", clist->commands[1].argv[0]);
+    //printf("Command[1]Arg[1]: %s", clist->commands[1].argv[1]);
+
+    /*for (int i = 0; i < clist->num; i++) {
+        printf("Command[%d]: ", i);
+        for (int j = 0; j < clist->commands[i].argc; j++) {
+            printf("%s\n", clist->commands[i].argv[j]); 
+        }
+        printf("\n"); 
+    } */
+
+    for (int i = 0; i < clist->num; i++) {
+        if (strcmp(clist->commands[i].argv[0], "grep") == 0) {
+            for (int j = 1; clist->commands[i].argv[j] != NULL; j++) {
+                char *arg = clist->commands[i].argv[j];
+                size_t len = strlen(arg);
+    
+                if (arg[0] == '"' && arg[len - 1] == '"') {
+                    for (size_t k = 0; k < len - 2; k++) {
+                        arg[k] = arg[k + 1];
+                    }
+                    arg[len - 2] = '\0'; 
+                }
+            }
+        }
+    }
+
+    //printf("Clist number is %d, Cmd_buff Number is %d \n", clist->num, cmd_buff->argc);
+
+    
+
+    return 0; // Success
+}
+
+int free_cmd_list(command_list_t *clist) {
+    
+    return 0; // Success
+}
+
+int execute_pipeline(command_list_t *clist) {
+    int num_commands = clist->num;
+    //printf("Number of commands %d\n", num_commands);
+    
+    int pipes[num_commands - 1][2];
+    pid_t pids[num_commands];
+
+    for (int i = 0; i < num_commands - 1; i++) {
+        if (pipe(pipes[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    for (int i = 0; i < num_commands; i++) {
+        pids[i] = fork();
+        if (pids[i] == -1) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
+
+        if (pids[i] == 0) {  // Child process
+            // Set up input pipe for all except first process
+            if (i > 0) {
+                dup2(pipes[i-1][0], STDIN_FILENO);
+            }
+
+            // Set up output pipe for all except last process
+            if (i < num_commands - 1) {
+                dup2(pipes[i][1], STDOUT_FILENO);
+            }
+
+            // Close all pipe ends in child
+            for (int j = 0; j < num_commands - 1; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            // Execute command
+            execvp(clist->commands[i].argv[0], clist->commands[i].argv);
+            //perror("execvp");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Parent process: close all pipe ends
+    for (int i = 0; i < num_commands - 1; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
+
+    // Wait for all children
+    for (int i = 0; i < num_commands; i++) {
+        waitpid(pids[i], NULL, 0);
+    }
+    return OK;
+}
+
+
 
 int exec_local_cmd_loop()
 {
@@ -491,12 +431,48 @@ int exec_local_cmd_loop()
         //printf("Am Before Build\n");
         // TODO IMPLEMENT parsing input to cmd_buff_t *cmd_buff
         rc = build_cmd_buff(cmd_buff, &cmd);
+        rc = build_cmd_list(&cmd, &clist);
         
         if (rc < 0) {
             break;
         } 
+        
+        if (clist.num == 1) {
+            Built_In_Cmds command = match_command(clist.commands[0].argv[0]);
+            //printf("%s\n",clist->commands[0].argv[0] );
+            if (command == BI_CMD_EXIT) {
+                rc = OK_EXIT;
+                //printf("Execute");
+                return rc;
+                //printf("Execute After");
+            } else if (command == BI_CMD_DRAGON) {
+                print_dragon();
+                return rc;
+            } else if (command == BI_CMD_CD) {
+                if (clist.commands[0].argv[1] != NULL) {
+                    if (chdir(clist.commands[0].argv[1]) == 0) {
+                        //printf("Successfully changed directory: %s\n", cmd->argv[1]);
+                    } else {
+                        rc = ERR_EXEC_CMD;
+                        return rc;
+                    }
+                }
+            } 
+        } 
 
-        rc = exec_cmd(&cmd);
+        pid_t supervisor = fork();
+        if (supervisor == -1) {
+            perror("fork supervisor");
+            exit(EXIT_FAILURE);
+        }
+
+        if (supervisor == 0) {
+            //printf("Make it here");
+            rc = execute_pipeline(&clist);
+            exit(EXIT_SUCCESS);
+        }
+        
+        waitpid(supervisor, NULL, 0);
 
         //printf("Problem is here");
         if (rc == OK_EXIT || rc == ERR_CMD_ARGS_BAD) {
