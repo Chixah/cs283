@@ -56,12 +56,15 @@ typedef struct command_list{
 
 
 //prototypes
+void print_dragon();
+void empty(command_list_t *clist);
+int is_empty(char *cmd_line);
 int alloc_cmd_buff(cmd_buff_t *cmd_buff);
 int free_cmd_buff(cmd_buff_t *cmd_buff);
 int clear_cmd_buff(cmd_buff_t *cmd_buff);
 int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff);
 int close_cmd_buff(cmd_buff_t *cmd_buff);
-int build_cmd_list(char *cmd_line, command_list_t *clist);
+int build_cmd_list(cmd_buff_t *cmd_buff, command_list_t *clist);
 int free_cmd_list(command_list_t *cmd_lst);
 
 //built in command stuff
@@ -73,7 +76,6 @@ typedef enum {
     BI_CMD_STOP_SVR,        //new command "stop-server"
     BI_NOT_BI,
     BI_EXECUTED,
-    BI_NOT_IMPLEMENTED,
 } Built_In_Cmds;
 Built_In_Cmds match_command(const char *input); 
 Built_In_Cmds exec_built_in_cmd(cmd_buff_t *cmd);
@@ -88,6 +90,6 @@ int execute_pipeline(command_list_t *clist);
 #define CMD_OK_HEADER       "PARSED COMMAND LINE - TOTAL COMMANDS %d\n"
 #define CMD_WARN_NO_CMD     "warning: no commands provided\n"
 #define CMD_ERR_PIPE_LIMIT  "error: piping limited to %d commands\n"
-
+#define BI_NOT_IMPLEMENTED "not implemented"
 
 #endif
